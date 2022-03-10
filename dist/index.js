@@ -25,32 +25,66 @@ class InvalidDataError extends Error {
 }
 var filefilesystem;
 (function (filefilesystem) {
-    const VERSION = "1";
+    const VERSION = "2";
+    class FileFileSystemOptions {
+        constructor() {
+            this.maxFileSize = Math.pow(2, 31) - 1;
+            this.flat = false;
+        }
+    }
     class FileFileSystem {
-        constructor(file, maxFileSize) {
+        constructor(file) {
             if (file == null) {
                 throw new NullError("file");
             }
             if (!file.endsWith(".ffs")) {
                 throw new FilePathError(file, "File must end in .ffs");
             }
-            if (maxFileSize == null) {
-                maxFileSize = Math.pow(2, 31) - 1;
-            }
-            if (Math.round(maxFileSize) != maxFileSize) {
-                throw new ParamError("maxFileSize", "must be a whole number");
-            }
             this._file = file;
-            if (!fs.existsSync(file)) {
-                this.data = new FileFileData("ffs;1\\s0;" + maxFileSize + ";0\\s\\s");
-                this.save();
-            }
-            else {
-                this.data = this.load();
-            }
         }
         get file() { return this._file; }
-        load() {
+        static createIfNotExist(file, { maxFileSize, flat } = new FileFileSystemOptions()) {
+            if (file == null) {
+                throw new NullError("file");
+            }
+            if (!file.endsWith(".ffs")) {
+                throw new FilePathError(file, "File must end in .ffs");
+            }
+            if (Math.round(maxFileSize) != maxFileSize) {
+                throw new ParamError("options.maxFileSize", "must be a whole number");
+            }
+            if (!fs.existsSync(file)) {
+                return FileFileSystem.create(file, { maxFileSize, flat });
+            }
+            else {
+                return FileFileSystem.load(file);
+            }
+        }
+        static load(file) {
+            var fileSystem = new FileFileSystem(file);
+            if (fs.existsSync(file)) {
+                fileSystem.data = fileSystem.reload();
+            }
+            else {
+                throw new FileNotExistsError(file);
+            }
+            return fileSystem;
+        }
+        static create(file, { maxFileSize, flat } = new FileFileSystemOptions()) {
+            var fileSystem = new FileFileSystem(file);
+            if (Math.round(maxFileSize) != maxFileSize) {
+                throw new ParamError("options.maxFileSize", "must be a whole number");
+            }
+            if (!fs.existsSync(file)) {
+                fileSystem.data = new FileFileData("ffs;2|0;" + maxFileSize + ";0;" + (flat ? "1" : "0") + "||");
+                fileSystem.save();
+            }
+            else {
+                throw new FileExistsError(file);
+            }
+            return fileSystem;
+        }
+        reload() {
             this.data = new FileFileData(fs.readFileSync(this.file, { encoding: "binary" }));
             this.data.meta.fileCount = this.data.table.entries.length;
             this.data.meta.size = this.data.data.length;
@@ -62,7 +96,7 @@ var filefilesystem;
             fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" });
         }
         validPath(path) {
-            return !path.includes("\\") && !path.includes(";") && !path.includes(",") && !path.startsWith("/") && !path.endsWith("/");
+            return !(path.includes("|") || path.includes(";") || path.includes(",") || path.startsWith("/") || path.endsWith("/") || (this.data.meta.flat && path.includes("/")));
         }
         fixPath(path) {
             path = path.replace(/\\/g, "/");
@@ -76,11 +110,11 @@ var filefilesystem;
                 return path;
             }
             else {
-                return "";
+                throw new InvalidFilePathError(path);
             }
         }
         validData(data) {
-            return !data.includes("\\s");
+            return !data.includes("|");
         }
         exists(file) {
             file = this.fixPath(file);
@@ -199,13 +233,21 @@ var filefilesystem;
             file = this.fixPath(file);
             newname = this.fixPath(newname);
             if (this.exists(file)) {
-                for (var entry of this.data.table.entries) {
-                    if (entry.name == file) {
-                        entry.name = newname;
-                        return;
+                if (!this.exists(newname)) {
+                    for (var entry of this.data.table.entries) {
+                        if (entry.name == file) {
+                            entry.name = newname;
+                            return;
+                        }
                     }
+                    throw new Error("Could not find file in table");
                 }
-                throw new Error("Could not find file in table");
+                else {
+                    throw new FileExistsError(file);
+                }
+            }
+            else {
+                throw new FileNotExistsError(file);
             }
         }
         copyFile(file, dest) {
@@ -217,26 +259,26 @@ var filefilesystem;
             if (raw == null) {
                 throw new NullError("raw");
             }
-            if (raw.split("\\s")[0] != null) {
-                this._header = new FileFileHeader(raw.split("\\s")[0]);
+            if (raw.split("|")[0] != null) {
+                this._header = new FileFileHeader(raw.split("|")[0]);
             }
             else {
                 throw new MalformedFileError("File does not contain a header");
             }
-            if (raw.split("\\s")[1] != null) {
-                this._meta = new FileFileMeta(raw.split("\\s")[1]);
+            if (raw.split("|")[1] != null) {
+                this._meta = new FileFileMeta(raw.split("|")[1]);
             }
             else {
                 throw new MalformedFileError("File does not contain meta");
             }
-            if (raw.split("\\s")[2] != null) {
-                this._table = new FileFileTable(raw.split("\\s")[2]);
+            if (raw.split("|")[2] != null) {
+                this._table = new FileFileTable(raw.split("|")[2]);
             }
             else {
                 throw new MalformedFileError("File does not contain a table");
             }
-            if (raw.split("\\s")[3] != null) {
-                this._data = raw.split("\\s")[3];
+            if (raw.split("|")[3] != null) {
+                this._data = raw.split("|")[3];
             }
             else {
                 throw new MalformedFileError("File does not contain file data");
@@ -248,7 +290,7 @@ var filefilesystem;
         get data() { return this._data; }
         set data(value) { this._data = value; }
         toString() {
-            return this.header.toString() + "\\s" + this.meta.toString() + "\\s" + this.table.toString() + "\\s" + this.data.toString();
+            return this.header.toString() + "|" + this.meta.toString() + "|" + this.table.toString() + "|" + this.data.toString();
         }
     }
     class FileFileHeader {
@@ -263,7 +305,7 @@ var filefilesystem;
                 this.version = raw.split(";")[1];
             }
             else {
-                throw new MalformedFileError("File does not contain a version");
+                throw new MalformedFileError("Header does not contain a version");
             }
             if (this.version != VERSION) {
                 throw new MalformedFileError("File uses an unknown or unsupported version");
@@ -282,23 +324,30 @@ var filefilesystem;
                 this.size = parseInt(raw.split(";")[0]);
             }
             else {
-                throw new MalformedFileError("File does not contain a size");
+                throw new MalformedFileError("Meta does not contain a size");
             }
             if (raw.split(";")[1] != null) {
                 this.max = parseInt(raw.split(";")[1]);
             }
             else {
-                throw new MalformedFileError("File does not contain a max size");
+                throw new MalformedFileError("Meta does not contain a max size");
             }
             if (raw.split(";")[2] != null) {
                 this.fileCount = parseInt(raw.split(";")[2]);
             }
             else {
-                throw new MalformedFileError("File does not contain a file count");
+                throw new MalformedFileError("Meta does not contain a file count");
+            }
+            if (raw.split(";")[3] != null) {
+                this._flat = raw.split(";")[3] == "1";
+            }
+            else {
+                throw new MalformedFileError("Meta does not contain flat");
             }
         }
+        get flat() { return this._flat; }
         toString() {
-            return this.size + ";" + this.max + ";" + this.fileCount;
+            return this.size + ";" + this.max + ";" + this.fileCount + ";" + (this.flat ? "1" : "0");
         }
     }
     class FileFileTable {
