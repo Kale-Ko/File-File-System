@@ -15,7 +15,7 @@ Then in your script add `const { FileFileSystem } = require("file-file-system")`
 
 ## Creating a file file system
 
-To create a file system you just need to instantiate a FileFileSystem object. `const fileSystem = new FileFileSystem(fileName)`
+To create a file system you just need to instantiate a FileFileSystem object. `const fileSystem = FileFileSystem.createIfNotExist(fileName, options (optional))`
 
 ## Reading files
 
