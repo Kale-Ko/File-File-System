@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+        "module": "es2020",
+        "target": "es2020",
+        "outDir": "dist",
+        "allowUnreachableCode": false,
+        "allowUnusedLabels": true,
+        "alwaysStrict": false,
+        "noImplicitAny": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noImplicitUseStrict": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "preserveConstEnums": true,
+        "pretty": true,
+        "removeComments": true,
+        "sourceMap": false,
+        "strict": true,
+        "strictBindCallApply": true,
+        "strictFunctionTypes": false,
+        "strictNullChecks": true,
+        "strictPropertyInitialization": true,
+        "watch": true,
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}
