@@ -205,18 +205,23 @@ var filefilesystem;
             }
         }
         readDir(dir) {
-            dir = this.fixPath(dir);
-            if (this.exists(dir)) {
-                var results = [];
-                for (var entry of this.data.table.entries) {
-                    if (entry.name.startsWith(dir)) {
-                        results.push(entry.name.substring(dir.length + 1));
+            if (!this.data.meta.flat) {
+                dir = this.fixPath(dir);
+                if (this.exists(dir)) {
+                    var results = [];
+                    for (var entry of this.data.table.entries) {
+                        if (entry.name.startsWith(dir)) {
+                            results.push(entry.name.substring(dir.length + 1));
+                        }
                     }
+                    return results;
                 }
-                return results;
+                else {
+                    throw new FileNotExistsError(dir);
+                }
             }
             else {
-                throw new FileNotExistsError(dir);
+                throw new Error("This disk is flat");
             }
         }
         writeFile(file, data) {
