@@ -25,7 +25,7 @@ class InvalidDataError extends Error {
 }
 var filefilesystem;
 (function (filefilesystem) {
-    const VERSION = "1.0.1";
+    const VERSION = "1";
     class FileFileSystem {
         constructor(file, maxFileSize) {
             if (file == null) {
@@ -42,7 +42,7 @@ var filefilesystem;
             }
             this._file = file;
             if (!fs.existsSync(file)) {
-                this.data = new FileFileData("ffs;1.0.1\\s0;" + maxFileSize + ";0\\s\\s");
+                this.data = new FileFileData("ffs;1\\s0;" + maxFileSize + ";0\\s\\s");
                 this.save();
             }
             else {

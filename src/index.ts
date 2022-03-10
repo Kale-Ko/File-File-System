@@ -10,7 +10,7 @@ class InvalidFilePathError extends Error { public constructor(file: string) { su
 class InvalidDataError extends Error { public constructor(file: string) { super("That data is not valid/allowed") } }
 
 namespace filefilesystem {
-    const VERSION = "1.0.1"
+    const VERSION = "1"
 
     class FileFileSystem {
         private _file: string
@@ -38,7 +38,7 @@ namespace filefilesystem {
             this._file = file
 
             if (!fs.existsSync(file)) {
-                this.data = new FileFileData("ffs;1.0.1\\s0;" + maxFileSize + ";0\\s\\s")
+                this.data = new FileFileData("ffs;1\\s0;" + maxFileSize + ";0\\s\\s")
                 this.save()
             } else {
                 this.data = this.load()
