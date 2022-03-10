@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "module": "es2020",
-        "target": "es2020",
+        "target": "es2021",
         "outDir": "dist",
         "allowUnreachableCode": false,
         "allowUnusedLabels": true,
