@@ -26,6 +26,11 @@ class InvalidDataError extends Error {
 var filefilesystem;
 (function (filefilesystem) {
     const VERSION = "2";
+    class FileFileSystemOpenOptions {
+        constructor() {
+            this.autoSave = true;
+        }
+    }
     class FileFileSystemOptions {
         constructor() {
             this.maxFileSize = Math.pow(2, 31) - 1;
@@ -33,7 +38,7 @@ var filefilesystem;
         }
     }
     class FileFileSystem {
-        constructor(file) {
+        constructor(file, { autoSave } = new FileFileSystemOpenOptions()) {
             if (file == null) {
                 throw new NullError("file");
             }
@@ -41,9 +46,10 @@ var filefilesystem;
                 throw new FilePathError(file, "File must end in .ffs");
             }
             this._file = file;
+            this.autoSave = autoSave;
         }
         get file() { return this._file; }
-        static createIfNotExist(file, { maxFileSize, flat } = new FileFileSystemOptions()) {
+        static createIfNotExist(file, { autoSave } = new FileFileSystemOpenOptions(), { maxFileSize, flat } = new FileFileSystemOptions()) {
             if (file == null) {
                 throw new NullError("file");
             }
@@ -54,14 +60,14 @@ var filefilesystem;
                 throw new ParamError("options.maxFileSize", "must be a whole number");
             }
             if (!fs.existsSync(file)) {
-                return FileFileSystem.create(file, { maxFileSize, flat });
+                return FileFileSystem.create(file, { autoSave }, { maxFileSize, flat });
             }
             else {
-                return FileFileSystem.load(file);
+                return FileFileSystem.load(file, { autoSave });
             }
         }
-        static load(file) {
-            var fileSystem = new FileFileSystem(file);
+        static load(file, { autoSave } = new FileFileSystemOpenOptions()) {
+            var fileSystem = new FileFileSystem(file, { autoSave });
             if (fs.existsSync(file)) {
                 fileSystem.data = fileSystem.reload();
             }
@@ -70,13 +76,13 @@ var filefilesystem;
             }
             return fileSystem;
         }
-        static create(file, { maxFileSize, flat } = new FileFileSystemOptions()) {
-            var fileSystem = new FileFileSystem(file);
+        static create(file, { autoSave } = new FileFileSystemOpenOptions(), { maxFileSize, flat } = new FileFileSystemOptions()) {
+            var fileSystem = new FileFileSystem(file, { autoSave });
             if (Math.round(maxFileSize) != maxFileSize) {
                 throw new ParamError("options.maxFileSize", "must be a whole number");
             }
             if (!fs.existsSync(file)) {
-                fileSystem.data = new FileFileData("ffs;2|0;" + maxFileSize + ";0;" + (flat ? "1" : "0") + "||");
+                fileSystem.data = new FileFileData("ffs;2|0;0;" + maxFileSize + ";0;" + (flat ? "1" : "0") + "||");
                 fileSystem.save();
             }
             else {
@@ -92,8 +98,14 @@ var filefilesystem;
         }
         save() {
             this.data.meta.fileCount = this.data.table.entries.length;
-            this.data.meta.size = this.data.data.length;
-            fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" });
+            this.data.meta.size = this.data.toString().length;
+            this.data.meta.datasize = this.data.data.length;
+            if (this.data.meta.size <= this.data.meta.max) {
+                fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" });
+            }
+            else {
+                throw new Error("Can't save file because it would be larger than the max file size");
+            }
         }
         validPath(path) {
             return !(path.includes("|") || path.includes(";") || path.includes(",") || path.startsWith("/") || path.endsWith("/") || (this.data.meta.flat && path.includes("/")));
@@ -115,6 +127,9 @@ var filefilesystem;
         }
         validData(data) {
             return !data.includes("|");
+        }
+        diskMeta() {
+            return this.data.meta;
         }
         exists(file) {
             file = this.fixPath(file);
@@ -143,6 +158,9 @@ var filefilesystem;
             file = this.fixPath(file);
             if (!this.exists(file)) {
                 this.data.table.entries.push(new FileFileTableEntry(file, this.data.data.length + 1, 0));
+                if (this.autoSave) {
+                    this.save();
+                }
             }
             else {
                 throw new FileExistsError(file);
@@ -160,6 +178,9 @@ var filefilesystem;
                         }
                         this.data.table.entries.splice(this.data.table.entries.indexOf(entry), 1);
                         this.data.data = this.data.data.substring(0, (entry.start - 1)) + this.data.data.substring((entry.start - 1) + entry.length);
+                        if (this.autoSave) {
+                            this.save();
+                        }
                         return;
                     }
                 }
@@ -212,6 +233,9 @@ var filefilesystem;
                                     entry2.start += entry.length - prevlength;
                                 }
                             }
+                            if (this.autoSave) {
+                                this.save();
+                            }
                             return;
                         }
                     }
@@ -237,6 +261,9 @@ var filefilesystem;
                     for (var entry of this.data.table.entries) {
                         if (entry.name == file) {
                             entry.name = newname;
+                            if (this.autoSave) {
+                                this.save();
+                            }
                             return;
                         }
                     }
@@ -327,19 +354,25 @@ var filefilesystem;
                 throw new MalformedFileError("Meta does not contain a size");
             }
             if (raw.split(";")[1] != null) {
-                this.max = parseInt(raw.split(";")[1]);
+                this.datasize = parseInt(raw.split(";")[1]);
+            }
+            else {
+                throw new MalformedFileError("Meta does not contain a data size");
+            }
+            if (raw.split(";")[2] != null) {
+                this.max = parseInt(raw.split(";")[2]);
             }
             else {
                 throw new MalformedFileError("Meta does not contain a max size");
             }
-            if (raw.split(";")[2] != null) {
-                this.fileCount = parseInt(raw.split(";")[2]);
+            if (raw.split(";")[3] != null) {
+                this.fileCount = parseInt(raw.split(";")[3]);
             }
             else {
                 throw new MalformedFileError("Meta does not contain a file count");
             }
-            if (raw.split(";")[3] != null) {
-                this._flat = raw.split(";")[3] == "1";
+            if (raw.split(";")[4] != null) {
+                this._flat = raw.split(";")[4] == "1";
             }
             else {
                 throw new MalformedFileError("Meta does not contain flat");
@@ -347,7 +380,7 @@ var filefilesystem;
         }
         get flat() { return this._flat; }
         toString() {
-            return this.size + ";" + this.max + ";" + this.fileCount + ";" + (this.flat ? "1" : "0");
+            return this.size + ";" + this.datasize + ";" + this.max + ";" + this.fileCount + ";" + (this.flat ? "1" : "0");
         }
     }
     class FileFileTable {
