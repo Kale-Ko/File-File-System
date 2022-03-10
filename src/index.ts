@@ -12,6 +12,10 @@ class InvalidDataError extends Error { public constructor(file: string) { super(
 namespace filefilesystem {
     const VERSION = "2"
 
+    class FileFileSystemOpenOptions {
+        public autoSave: boolean = true
+    }
+
     class FileFileSystemOptions {
         public maxFileSize: number = Math.pow(2, 31) - 1
         public flat: boolean = false
@@ -23,7 +27,9 @@ namespace filefilesystem {
 
         private data: FileFileData
 
-        private constructor(file: string) {
+        public autoSave: boolean
+
+        private constructor(file: string, { autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions()) {
             if (file == null) {
                 throw new NullError("file")
             }
@@ -33,9 +39,11 @@ namespace filefilesystem {
             }
 
             this._file = file
+
+            this.autoSave = autoSave
         }
 
-        public static createIfNotExist(file: string, { maxFileSize, flat }: FileFileSystemOptions = new FileFileSystemOptions()) {
+        public static createIfNotExist(file: string, { autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions(), { maxFileSize, flat }: FileFileSystemOptions = new FileFileSystemOptions()) {
             if (file == null) {
                 throw new NullError("file")
             }
@@ -49,14 +57,14 @@ namespace filefilesystem {
             }
 
             if (!fs.existsSync(file)) {
-                return FileFileSystem.create(file, { maxFileSize, flat })
+                return FileFileSystem.create(file, { autoSave }, { maxFileSize, flat })
             } else {
-                return FileFileSystem.load(file)
+                return FileFileSystem.load(file, { autoSave })
             }
         }
 
-        public static load(file: string) {
-            var fileSystem = new FileFileSystem(file)
+        public static load(file: string, { autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions()) {
+            var fileSystem = new FileFileSystem(file, { autoSave })
 
             if (fs.existsSync(file)) {
                 fileSystem.data = fileSystem.reload()
@@ -67,15 +75,15 @@ namespace filefilesystem {
             return fileSystem
         }
 
-        public static create(file: string, { maxFileSize, flat }: FileFileSystemOptions = new FileFileSystemOptions()) {
-            var fileSystem = new FileFileSystem(file)
+        public static create(file: string, { autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions(), { maxFileSize, flat }: FileFileSystemOptions = new FileFileSystemOptions()) {
+            var fileSystem = new FileFileSystem(file, { autoSave })
 
             if (Math.round(maxFileSize) != maxFileSize) {
                 throw new ParamError("options.maxFileSize", "must be a whole number")
             }
 
             if (!fs.existsSync(file)) {
-                fileSystem.data = new FileFileData("ffs;2|0;" + maxFileSize + ";0;" + (flat ? "1" : "0") + "||")
+                fileSystem.data = new FileFileData("ffs;2|0;0;" + maxFileSize + ";0;" + (flat ? "1" : "0") + "||")
                 fileSystem.save()
             } else {
                 throw new FileExistsError(file)
@@ -94,15 +102,21 @@ namespace filefilesystem {
 
         public save() {
             this.data.meta.fileCount = this.data.table.entries.length
-            this.data.meta.size = this.data.data.length
-            fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" })
+            this.data.meta.size = this.data.toString().length
+            this.data.meta.datasize = this.data.data.length
+
+            if (this.data.meta.size <= this.data.meta.max) {
+                fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" })
+            } else {
+                throw new Error("Can't save file because it would be larger than the max file size")
+            }
         }
 
-        public validPath(path: string) {
+        private validPath(path: string) {
             return !(path.includes("|") || path.includes(";") || path.includes(",") || path.startsWith("/") || path.endsWith("/") || (this.data.meta.flat && path.includes("/")))
         }
 
-        public fixPath(path: string) {
+        private fixPath(path: string) {
             path = path.replace(/\\/g, "/")
 
             if (path.startsWith("/")) {
@@ -120,8 +134,12 @@ namespace filefilesystem {
             }
         }
 
-        public validData(data: string) {
+        private validData(data: string) {
             return !data.includes("|")
+        }
+
+        public diskMeta() {
+            return this.data.meta
         }
 
         public exists(file: string) {
@@ -157,6 +175,10 @@ namespace filefilesystem {
 
             if (!this.exists(file)) {
                 this.data.table.entries.push(new FileFileTableEntry(file, this.data.data.length + 1, 0))
+
+                if (this.autoSave) {
+                    this.save()
+                }
             } else {
                 throw new FileExistsError(file)
             }
@@ -176,6 +198,10 @@ namespace filefilesystem {
 
                         this.data.table.entries.splice(this.data.table.entries.indexOf(entry), 1)
                         this.data.data = this.data.data.substring(0, (entry.start - 1)) + this.data.data.substring((entry.start - 1) + entry.length)
+
+                        if (this.autoSave) {
+                            this.save()
+                        }
 
                         return
                     }
@@ -238,6 +264,10 @@ namespace filefilesystem {
                                 }
                             }
 
+                            if (this.autoSave) {
+                                this.save()
+                            }
+
                             return
                         }
                     }
@@ -266,6 +296,10 @@ namespace filefilesystem {
                     for (var entry of this.data.table.entries) {
                         if (entry.name == file) {
                             entry.name = newname
+
+                            if (this.autoSave) {
+                                this.save()
+                            }
 
                             return
                         }
@@ -361,6 +395,7 @@ namespace filefilesystem {
 
     class FileFileMeta {
         public size: number
+        public datasize: number
         public max: number
 
         public fileCount: number
@@ -380,26 +415,32 @@ namespace filefilesystem {
             }
 
             if (raw.split(";")[1] != null) {
-                this.max = parseInt(raw.split(";")[1])
+                this.datasize = parseInt(raw.split(";")[1])
+            } else {
+                throw new MalformedFileError("Meta does not contain a data size")
+            }
+
+            if (raw.split(";")[2] != null) {
+                this.max = parseInt(raw.split(";")[2])
             } else {
                 throw new MalformedFileError("Meta does not contain a max size")
             }
 
-            if (raw.split(";")[2] != null) {
-                this.fileCount = parseInt(raw.split(";")[2])
+            if (raw.split(";")[3] != null) {
+                this.fileCount = parseInt(raw.split(";")[3])
             } else {
                 throw new MalformedFileError("Meta does not contain a file count")
             }
 
-            if (raw.split(";")[3] != null) {
-                this._flat = raw.split(";")[3] == "1"
+            if (raw.split(";")[4] != null) {
+                this._flat = raw.split(";")[4] == "1"
             } else {
                 throw new MalformedFileError("Meta does not contain flat")
             }
         }
 
         public toString() {
-            return this.size + ";" + this.max + ";" + this.fileCount + ";" + (this.flat ? "1" : "0")
+            return this.size + ";" + this.datasize + ";" + this.max + ";" + this.fileCount + ";" + (this.flat ? "1" : "0")
         }
     }
 
