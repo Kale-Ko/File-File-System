@@ -230,20 +230,24 @@ namespace filefilesystem {
         }
 
         public readDir(dir: string) {
-            dir = this.fixPath(dir)
+            if (!this.data.meta.flat) {
+                dir = this.fixPath(dir)
 
-            if (this.exists(dir)) {
-                var results = []
+                if (this.exists(dir)) {
+                    var results = []
 
-                for (var entry of this.data.table.entries) {
-                    if (entry.name.startsWith(dir)) {
-                        results.push(entry.name.substring(dir.length + 1))
+                    for (var entry of this.data.table.entries) {
+                        if (entry.name.startsWith(dir)) {
+                            results.push(entry.name.substring(dir.length + 1))
+                        }
                     }
-                }
 
-                return results
+                    return results
+                } else {
+                    throw new FileNotExistsError(dir)
+                }
             } else {
-                throw new FileNotExistsError(dir)
+                throw new Error("This disk is flat")
             }
         }
 
