@@ -1,0 +1,27 @@
+{
+    "name": "file-file-system",
+    "version": "1.0.0",
+    "description": "Kinda like a zip file, but worse",
+    "main": "dist/index.js",
+    "dependencies": {
+        "@types/node": "^17.0.21"
+    },
+    "author": {
+        "name": "Kale Ko",
+        "email": "contact@kaleko.ga",
+        "url": "https://kaleko.ga/"
+    },
+    "license": "MIT",
+    "keywords": [
+        "file",
+        "system"
+    ],
+    "homepage": "https://github.com/Kale-Ko/File-File-System#readme",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Kale-Ko/File-File-System/"
+    },
+    "bugs": {
+        "url": "https://github.com/Kale-Ko/File-File-System/issues"
+    }
+}
