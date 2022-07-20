@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
-        "module": "es2020",
-        "target": "es2021",
+        "module": "es2022",
+        "target": "es2022",
         "outDir": "dist",
         "allowUnreachableCode": false,
         "allowUnusedLabels": true,
@@ -22,12 +22,12 @@
         "strictFunctionTypes": false,
         "strictNullChecks": true,
         "strictPropertyInitialization": true,
-        "watch": true,
+        "watch": true
     },
     "include": [
         "src/**/*"
     ],
     "exclude": [
-        "node_modules"
+        "node_modules/**/*"
     ]
 }
