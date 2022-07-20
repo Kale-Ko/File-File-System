@@ -31,7 +31,7 @@ Check if file exists - `var exists = fileSystem.exists(file)`\
 Get file info - `var stat = fileSystem.statFile(file)`
 
 Create file - `fileSystem.createFile(file)`\
-delete file - `fileSystem.deleteFile(file)`
+Delete file - `fileSystem.deleteFile(file)`
 
 Read from file - `var content = fileSystem.readFile(file)`\
 Read directory contents - `var files = fileSystem.readDir(dir)`\
@@ -47,5 +47,5 @@ Copy file - `fileSystem.copy(source, dest)`
 
 ## Options
 
-`format` - The file system format (Normal, Flat) - Default normal
+`format` - The file system format (Normal, Flat) - Default normal\
 `fileSize` - The size the file is allowed to take up on the real disk (In kilobytes) - Default 64000 (64mb)
