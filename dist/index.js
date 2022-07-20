@@ -25,7 +25,6 @@ class InvalidDataError extends Error {
 }
 const VERSION = 2;
 class FileFileSystemOpenOptions {
-    autoLoad = true;
     autoSave = true;
 }
 var FileFileSystemFormat;
@@ -35,7 +34,7 @@ var FileFileSystemFormat;
 })(FileFileSystemFormat || (FileFileSystemFormat = {}));
 class FileFileSystemOptions {
     format = FileFileSystemFormat.NORMAL;
-    maxFileSize = Math.pow(2, 31) - 1;
+    maxFileSize = 64000;
 }
 class FileFileSystem {
     _file;
@@ -55,7 +54,7 @@ class FileFileSystem {
         }
         this.autoSave = autoSave;
     }
-    static createIfNotExist(file, { autoLoad = new FileFileSystemOpenOptions().autoLoad, autoSave = new FileFileSystemOpenOptions().autoSave } = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize } = new FileFileSystemOptions()) {
+    static createIfNotExist(file, { autoSave = new FileFileSystemOpenOptions().autoSave } = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize } = new FileFileSystemOptions()) {
         if (file == null) {
             throw new NullError("file");
         }
@@ -63,15 +62,15 @@ class FileFileSystem {
             throw new FilePathError(file, "File must end in .ffs");
         }
         if (!fs.existsSync(file)) {
-            return FileFileSystem.create(file, { autoLoad, autoSave }, { format, maxFileSize });
+            return FileFileSystem.create(file, { autoSave }, { format, maxFileSize });
         }
         else {
-            return FileFileSystem.load(file, { autoLoad, autoSave });
+            return FileFileSystem.load(file, { autoSave });
         }
     }
-    static load(file, { autoLoad = new FileFileSystemOpenOptions().autoLoad, autoSave = new FileFileSystemOpenOptions().autoSave } = new FileFileSystemOpenOptions()) {
-        var fileSystem = new FileFileSystem(file, { autoLoad, autoSave });
-        if (fs.existsSync(file) && autoLoad) {
+    static load(file, { autoSave = new FileFileSystemOpenOptions().autoSave } = new FileFileSystemOpenOptions()) {
+        var fileSystem = new FileFileSystem(file, { autoSave });
+        if (fs.existsSync(file)) {
             fileSystem.reload();
         }
         else {
@@ -80,7 +79,7 @@ class FileFileSystem {
         return fileSystem;
     }
     static create(file, { autoSave = new FileFileSystemOpenOptions().autoSave } = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize } = new FileFileSystemOptions()) {
-        var fileSystem = new FileFileSystem(file, { autoLoad: false, autoSave });
+        var fileSystem = new FileFileSystem(file, { autoSave });
         if (Math.round(maxFileSize) != maxFileSize) {
             throw new ParamError("options.maxFileSize", "must be a whole number");
         }
@@ -103,10 +102,18 @@ class FileFileSystem {
         this.data.meta.fileCount = this.data.table.entries.length;
         this.data.meta.size = this.data.toString().length;
         this.data.meta.dataSize = this.data.data.length;
-        if (this.data.meta.size <= this.data.meta.max) {
-            fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" });
+        var oldData = null;
+        if (fs.existsSync(this.file)) {
+            oldData = fs.readFileSync(this.file, { encoding: "binary" });
         }
-        else {
+        fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" });
+        if (fs.statSync(this.file).size > this.data.meta.max) {
+            if (oldData != null) {
+                fs.writeFileSync(this.file, oldData, { encoding: "binary" });
+            }
+            else {
+                fs.unlinkSync(this.file);
+            }
             throw new Error("Can't save file because it would be larger than the max file size");
         }
     }
