@@ -12,7 +12,6 @@ class InvalidDataError extends Error { public constructor(file: string) { super(
 const VERSION = 2
 
 class FileFileSystemOpenOptions {
-    public autoLoad: boolean = true
     public autoSave: boolean = true
 }
 
@@ -23,7 +22,7 @@ enum FileFileSystemFormat {
 
 class FileFileSystemOptions {
     public format: FileFileSystemFormat = FileFileSystemFormat.NORMAL
-    public maxFileSize: number = Math.pow(2, 31) - 1
+    public maxFileSize: number = 64000
 }
 
 class FileFileSystem {
@@ -52,7 +51,7 @@ class FileFileSystem {
         this.autoSave = autoSave
     }
 
-    public static createIfNotExist(file: string, { autoLoad = new FileFileSystemOpenOptions().autoLoad, autoSave = new FileFileSystemOpenOptions().autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize }: FileFileSystemOptions = new FileFileSystemOptions()) {
+    public static createIfNotExist(file: string, { autoSave = new FileFileSystemOpenOptions().autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize }: FileFileSystemOptions = new FileFileSystemOptions()) {
         if (file == null) {
             throw new NullError("file")
         }
@@ -62,16 +61,16 @@ class FileFileSystem {
         }
 
         if (!fs.existsSync(file)) {
-            return FileFileSystem.create(file, { autoLoad, autoSave }, { format, maxFileSize })
+            return FileFileSystem.create(file, { autoSave }, { format, maxFileSize })
         } else {
-            return FileFileSystem.load(file, { autoLoad, autoSave })
+            return FileFileSystem.load(file, { autoSave })
         }
     }
 
-    public static load(file: string, { autoLoad = new FileFileSystemOpenOptions().autoLoad, autoSave = new FileFileSystemOpenOptions().autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions()) {
-        var fileSystem = new FileFileSystem(file, { autoLoad, autoSave })
+    public static load(file: string, { autoSave = new FileFileSystemOpenOptions().autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions()) {
+        var fileSystem = new FileFileSystem(file, { autoSave })
 
-        if (fs.existsSync(file) && autoLoad) {
+        if (fs.existsSync(file)) {
             fileSystem.reload()
         } else {
             throw new FileNotExistsError(file)
@@ -81,7 +80,7 @@ class FileFileSystem {
     }
 
     public static create(file: string, { autoSave = new FileFileSystemOpenOptions().autoSave }: FileFileSystemOpenOptions = new FileFileSystemOpenOptions(), { format = new FileFileSystemOptions().format, maxFileSize = new FileFileSystemOptions().maxFileSize }: FileFileSystemOptions = new FileFileSystemOptions()) {
-        var fileSystem = new FileFileSystem(file, { autoLoad: false, autoSave })
+        var fileSystem = new FileFileSystem(file, { autoSave })
 
         if (Math.round(maxFileSize) != maxFileSize) {
             throw new ParamError("options.maxFileSize", "must be a whole number")
@@ -110,9 +109,20 @@ class FileFileSystem {
         this.data.meta.size = this.data.toString().length
         this.data.meta.dataSize = this.data.data.length
 
-        if (this.data.meta.size <= this.data.meta.max) {
-            fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" })
-        } else {
+        var oldData = null
+        if (fs.existsSync(this.file)) {
+            oldData = fs.readFileSync(this.file, { encoding: "binary" })
+        }
+
+        fs.writeFileSync(this.file, this.data.toString(), { encoding: "binary" })
+
+        if (fs.statSync(this.file).size > this.data.meta.max) {
+            if (oldData != null) {
+                fs.writeFileSync(this.file, oldData, { encoding: "binary" })
+            } else {
+                fs.unlinkSync(this.file)
+            }
+
             throw new Error("Can't save file because it would be larger than the max file size")
         }
     }

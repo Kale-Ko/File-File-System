@@ -21,15 +21,6 @@ Then in your script add `const { FileFileSystem } = require("file-file-system")`
 To create a file system you just need to instantiate a FileFileSystem object. `const fileSystem = FileFileSystem.createIfNotExist(fileName)`\
 You may also use `FileFileSystem.create(fileName)` and `FileFileSystem.load(fileName)` but you must check if the filesystem exists or not first.
 
-## Open Options
-
-`autoSave` - Wether or not to automatically save the file to disk for you whenever you modify a file
-
-## Options
-
-`format` - The file system format (Normal, Flat)
-`fileSize` - The size the file is allowed to take up on the real disk
-
 ## Methods
 
 Get disk meta - `var meta = fileSystem.diskMeta()`\
@@ -49,3 +40,12 @@ Append to file - `fileSystem.appendFile(file, content)`
 
 Rename/Move file - `fileSystem.rename(file, newFile)`\
 Copy file - `fileSystem.copy(source, dest)`
+
+## Open Options
+
+`autoSave` - Wether or not to automatically save the file to disk for you whenever you modify a file - Default true
+
+## Options
+
+`format` - The file system format (Normal, Flat) - Default normal
+`fileSize` - The size the file is allowed to take up on the real disk (In kilobytes) - Default 64000 (64mb)
