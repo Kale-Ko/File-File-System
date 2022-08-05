@@ -21,7 +21,7 @@ class InvalidFilePathError extends Error {
     constructor(file) { super("Path " + file + " is not valid/allowed"); }
 }
 class InvalidDataError extends Error {
-    constructor(file) { super("That data is not valid/allowed"); }
+    constructor() { super("That data is not valid/allowed"); }
 }
 const VERSION = 2;
 class FileFileSystemOpenOptions {
@@ -295,7 +295,7 @@ class FileFileSystem {
             }
         }
         else {
-            throw new InvalidDataError(data);
+            throw new InvalidDataError();
         }
     }
     appendFile(file, data) {
