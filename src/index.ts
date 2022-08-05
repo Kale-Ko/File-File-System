@@ -7,7 +7,7 @@ class MalformedFileError extends Error { public constructor(reason: string) { su
 class FileNotExistsError extends Error { public constructor(file: string) { super("File " + file + " does not exist") } }
 class FileAlreadyExistsError extends Error { public constructor(file: string) { super("File " + file + " already exists") } }
 class InvalidFilePathError extends Error { public constructor(file: string) { super("Path " + file + " is not valid/allowed") } }
-class InvalidDataError extends Error { public constructor(file: string) { super("That data is not valid/allowed") } }
+class InvalidDataError extends Error { public constructor() { super("That data is not valid/allowed") } }
 
 const VERSION = 2
 
@@ -342,7 +342,7 @@ class FileFileSystem {
                 this.writeFile(file, data)
             }
         } else {
-            throw new InvalidDataError(data)
+            throw new InvalidDataError()
         }
     }
 
